@@ -9,15 +9,36 @@ GameCycle::GameCycle()
     score = 0;
     tick = 0;
     exitFlag = false;
-    offset = 10;
     enemiesMax = 1;
 
     std::srand(std::time(0));
     initScreen();
     initEnemys();
     initBullets();
-    initPlayer();
-    startCycle();
+    initBackground();
+}
+
+GameCycle::GameCycle(GameCycle const &rhs)
+{
+    *this = rhs;
+}
+
+GameCycle& GameCycle::operator=(GameCycle const &src)
+{
+    this->player = src.player;
+    this->enemies = src.enemies;
+    this->enemiesCount = src.enemiesCount;
+    this->enemiesMax = src.enemiesMax;
+    this->bullets = src.bullets;
+    this->bulletsCount = src.bulletsCount;
+    this->score = src.score;
+    this->tick = src.tick;
+    this->exitFlag = src.exitFlag;
+    for (int i = 0; i < MAX_STARS_COUNT; i++)
+        this->st[i] = src.st[i];
+    this->screenWidth = src.screenWidth;
+    this->screenHeight = src.screenHeight;
+    return *this;
 }
 
 GameCycle::~GameCycle()
@@ -45,13 +66,9 @@ void    GameCycle::initEnemys()
 void    GameCycle::initBullets()
 {
     bulletsCount = 0;
-    // todo: implement bullets and add correct init
-}
-
-void    GameCycle::initPlayer() // Just in case, to gain more control over Player
-{
-    player.hp = 100;
-    // todo: remove this func if it will not be needed
+    bullets = new Bullet*[MAX_BULLETS_COUNT];
+    for (int i = 0; i < MAX_BULLETS_COUNT; i++)
+        bullets[i] = nullptr;
 }
 
 void    GameCycle::initScreen()
@@ -62,6 +79,19 @@ void    GameCycle::initScreen()
     timeout(0);
     cbreak();
     keypad(stdscr, true);
+    player.screenWidth = screenWidth;
+    player.screenHeight = screenHeight;
+    if (has_colors())
+    {
+        use_default_colors();
+        start_color();
+        init_color(COLOR_YELLOW, 255, 191, 127);
+        init_pair(1, COLOR_BLUE, -1);
+        init_pair(2, COLOR_RED, -1);
+        init_pair(3, COLOR_CYAN, -1);
+        init_pair(4, COLOR_GREEN, -1);
+        init_pair(5, COLOR_YELLOW, -1);
+    }
 }
 
 // Check collisions with all enemies
@@ -81,79 +111,15 @@ void    GameCycle::actPlayer()
             {
                 action.action = DEATH;
                 action.senderType = PLAYER;
-                makeAction(action);
-                break;
-            }
-        for (int i = 0; i < bulletsCount; i++) // Collide player with all enemy bullets
-            if (bullets[i].type == ENEMY_BULLET &&
-                    collide((GameObject*)&player, (GameObject*)&bullets[i]))
-            {
-                action.action = DAMAGE;
-                action.senderType = PLAYER;
-                action.targetType = ENEMY_BULLET;
+                action.targetType = ENEMY;
                 action.targetIndex = i;
                 makeAction(action);
-                action.action = DEATH;
-                action.senderType = ENEMY_BULLET;
-                makeAction(action);
-                continue;
+                break;
             }
         action = player.action(tick);
         makeAction(action);
     }
     while (action.action != END_ACTION);
-
-}
-
-void    GameCycle::actBullets()
-{
-    Action  action;
-
-    for (int i = 0; i < bulletsCount && bulletsCount; i++)
-    {
-        do
-        {
-            for (int j = 0; j < enemiesCount; j++) // Collide player bullet with all enemies
-                if (bullets[i].type == PLAYER_BULLET &&
-                        collide((GameObject*)&bullets[i], (GameObject*)enemies[j]))
-                {
-                    action.action = DAMAGE;
-                    action.senderType = ENEMY;
-                    action.senderIndex = j;
-                    action.targetType = PLAYER_BULLET;
-                    action.targetIndex = i;
-                    makeAction(action);
-                    action.action = DEATH;
-                    action.senderType = PLAYER_BULLET;
-                    makeAction(action);
-                    break;
-                }
-            if (action.action == DEATH) // Our bullet is dead. No need in further checks
-                break;
-            for (int j = 0; j < bulletsCount; j++) // Collide bullet with all other bullets
-                if (bullets[i].type != bullets[j].type &&
-                    collide((GameObject*)&bullets[i], (GameObject*)&bullets[j]))
-                {
-                    action.action = DEATH;
-                    action.senderType = ENEMY_BULLET;
-                    action.senderIndex = i;
-                    makeAction(action);
-                    action.action = DEATH;
-                    action.senderType = PLAYER_BULLET;
-                    action.senderIndex = j;
-                    makeAction(action);
-                    break;
-                }
-            if (action.action != DEATH) // Our bullet is dead. It cant take actions
-            {
-                action = bullets[i].action(tick);
-                makeAction(action);
-            }
-        }
-        while (action.action != END_ACTION && action.action != DEATH);
-        if (action.action == DEATH) // New bullet will be in position of the old one
-            i--;
-    }
 }
 
 void    GameCycle::actEnemies()
@@ -164,28 +130,84 @@ void    GameCycle::actEnemies()
     {
         do
         {
-            for (int j = 0; j < bulletsCount; j++) // Collide enemy with all player bullets
-                if (bullets[j].type == PLAYER_BULLET &&
-                    collide((GameObject*)enemies[i], (GameObject*)&bullets[j]))
+            action = enemies[i]->action(tick);
+            action.senderIndex = i;
+            makeAction(action);
+            if (action.action == DEATH)
+            {
+                i--;
+                break;
+            }
+        }
+        while (action.action != END_ACTION && action.action != DEATH && action.action != SHOOT);
+    }
+    refresh();
+}
+
+void    GameCycle::actBullet()
+{
+    Action  action;
+    int     flag;
+
+    for (int i = 0; i < bulletsCount && bulletsCount; i++)
+    {
+        flag = 0;
+        do
+        {
+            if (collide((GameObject*)(&player), (GameObject*)bullets[i])
+                && bullets[i]->type == ENEMY_BULLET)
+            {
+                action.senderType = PLAYER;
+                action.senderIndex = -1;
+                action.action = DAMAGE;
+                action.targetType = ENEMY_BULLET;
+                action.targetIndex = i;
+                makeAction(action);
+                removeBullet(i);
+                i--;
+                break;
+            }
+            for (int j = 0; j < enemiesCount; j++)
+            {
+                if (collide((GameObject*)enemies[j], (GameObject*)bullets[i])
+                    && bullets[i]->type == PLAYER_BULLET)
                 {
-                    action.action = DAMAGE;
                     action.senderType = ENEMY;
-                    action.senderIndex = i;
-                    action.targetType = PLAYER_BULLET;
-                    action.targetIndex = j;
-                    makeAction(action);
-                    action.action = DEATH;
-                    action.senderType = PLAYER_BULLET;
                     action.senderIndex = j;
+                    action.action = DAMAGE;
+                    action.targetType = PLAYER_BULLET;
+                    action.targetIndex = i;
                     makeAction(action);
+                    removeBullet(i);
+                    i--;
+                    flag = 1;
                     break;
                 }
-            action = enemies[i]->action(tick);
+            }
+            if (!flag)
+            {
+                for (int j = 0; j < bulletsCount; j++)
+                {
+                    if (collide((GameObject*)bullets[i], (GameObject*)bullets[j])
+                                && bullets[i]->type != bullets[j]->type)
+                    {
+                        removeBullet(i);
+                        removeBullet(j);
+                        if (i > j)
+                            i--;
+                        i--;
+                        flag = 1;
+                        break;
+                    }
+                }
+            }
+            if (flag)
+                break;
+            action = bullets[i]->action(tick);
+            action.senderIndex = i;
             makeAction(action);
         }
         while (action.action != END_ACTION && action.action != DEATH);
-        if (action.action == DEATH) // New enemy will be in position of the old one
-            i--;
     }
 }
 
@@ -193,30 +215,37 @@ void    GameCycle::addEnemy()
 {
     if (enemiesCount + 1 > MAX_ENEMIES_COUNT || enemiesCount + 1 > enemiesMax)
         return;
-    if (enemies[enemiesCount])
+    if (enemies[enemiesCount] != nullptr)
         return;
-    if ((enemies[enemiesCount] = new Enemy()))
-    {
-        int x = screenWidth;
-        int y = rand() % (screenHeight - 3);
-        enemies[enemiesCount]->shape.posX = x;
-        enemies[enemiesCount]->shape.posY = y;
-        enemies[enemiesCount]->dirX = 0;
-        enemies[enemiesCount]->dirY = y;
-        enemiesCount++;
-
-    }
+    enemies[enemiesCount] = new Enemy();
+    int x = screenWidth;
+    int y = rand() % (screenHeight - 3);
+    enemies[enemiesCount]->shape.posX = x;
+    enemies[enemiesCount]->shape.posY = y;
+    enemiesCount++;
 }
 
-void    GameCycle::addBullet(int type, int x, int y, int dirX, int dirY)
+void    GameCycle::removeEnemy(int index)
 {
-    if (bulletsCount == 256)
-        return ;
-    bullets[bulletsCount].type = type;
-    bullets[bulletsCount].shape.posX = x;
-    bullets[bulletsCount].shape.posX = y;
-    bullets[bulletsCount].dirX = dirX;
-    bullets[bulletsCount].dirY = dirY;
+    for (int i = index; i < enemiesCount - 1; i++)
+        std::swap(enemies[i], enemies[i + 1]);
+    enemiesCount--;
+    if (enemies[enemiesCount])
+        delete(enemies[enemiesCount]);
+    enemies[enemiesCount] = nullptr;
+}
+
+void    GameCycle::addBullet(int type, int x, int y)
+{
+    if (bulletsCount + 1 > MAX_BULLETS_COUNT)
+        return;
+    if (bullets[bulletsCount] != nullptr)
+        return;
+    bullets[bulletsCount] = new Bullet;
+    bullets[bulletsCount]->type = type;
+    bullets[bulletsCount]->shape.posX = x;
+    bullets[bulletsCount]->shape.posY = y;
+    bulletsCount++;
 }
 
 void    GameCycle::removeBullet(int index)
@@ -224,22 +253,23 @@ void    GameCycle::removeBullet(int index)
     for (int i = index; i < bulletsCount - 1; i++)
         std::swap(bullets[i], bullets[i + 1]);
     bulletsCount--;
-}
-
-void    GameCycle::removeEnemy(Enemy *enemy, int index)
-{
-    for (int i = index; i < enemiesCount - 1; i++)
-        std::swap(enemies[i], enemies[i + 1]);
-    delete(enemies[enemiesCount]);
-    enemies[enemiesCount] = nullptr;
-    enemiesCount--;
-
+    if (bullets[bulletsCount])
+        delete(bullets[bulletsCount]);
+    bullets[bulletsCount] = nullptr;
 }
 
 void    GameCycle::draw()
 {
+    int g;
+    for (int i = 0; i < MAX_STARS_COUNT; ++i)
+    {
+        g = rand()%5;
+        attron(COLOR_PAIR(g));
+        mvaddch(st[i].y, st[i].x, st[i].c);
+        attroff(COLOR_PAIR(g));
+    }
     for (int i = 0; i < bulletsCount; i++)
-        output((GameObject*)&bullets[i]);
+        output((GameObject*)bullets[i]);
     for (int i = 0; i < enemiesCount; i++)
         output((GameObject*)enemies[i]);
     output((GameObject*)&player);
@@ -247,26 +277,74 @@ void    GameCycle::draw()
 
 void    GameCycle::output(GameObject *obj)
 {
+    int     n;
+
+    if (obj->type == ENEMY)
+        n = 2;
+    else if (obj->type == PLAYER)
+        n = 1;
+    else if (obj->type == PLAYER_BULLET || obj->type == ENEMY_BULLET)
+        n = 4;
     for (int i = 0; i < obj->shape.height; i++)
         for (int j = 0; j < obj->shape.max_width; j++)
-            mvaddch(obj->shape.posY + i, obj->shape.posX + j, obj->shape.str[i].c_str()[j]);
+            if (obj->shape.str[i].c_str()[j])
+            {
+                attron(COLOR_PAIR(n));
+                mvaddch(obj->shape.posY + i, obj->shape.posX + j, obj->shape.str[i].c_str()[j]);
+                attroff(COLOR_PAIR(n));
+            }
 }
 
 void    GameCycle::makeAction(Action action)
 {
-//    switch (action.senderType)
-//    {
-//        case PLAYER:
-//            exitFlag = true;
-//            break;
-//        case ENEMY:
-//            exitFlag = true;
-//            break;
-//        default:
-//        std::cout << "Actor: " << action.senderType << std::endl;
-//    }
-    if (action.action == DEATH)
-        exitFlag = true;
+    switch (action.action)
+    {
+        case END_ACTION:
+            return;
+        case DEATH:
+            switch (action.senderType)
+            {
+                case PLAYER:
+                    exitFlag = true;
+                    break;
+                case ENEMY:
+                    score += 100;
+                    removeEnemy(action.senderIndex);
+                    break;
+                default:
+                    removeBullet(action.senderIndex);
+                    break;
+            }
+            break;
+        case DAMAGE:
+            switch (action.senderType)
+            {
+                case PLAYER:
+                    player.hit(bullets[action.targetIndex]->hp);
+                    if (player.hp <= 0)
+                        exitFlag = true;
+                    break;
+                case ENEMY:
+                    enemies[action.senderIndex]->hit(bullets[action.targetIndex]->hp);
+                    break;
+            }
+        case SHOOT:
+            switch (action.senderType)
+            {
+                case PLAYER:
+                    addBullet(PLAYER_BULLET,
+                              player.shape.posX + player.shape.max_width + 1,
+                              player.shape.posY + player.shape.height / 2);
+                    break;
+                case ENEMY:
+                    addBullet(ENEMY_BULLET,
+                              enemies[action.senderIndex]->shape.posX - 2,
+                              enemies[action.senderIndex]->shape.posY + enemies[action.senderIndex]->shape.height / 2);
+                    break;
+            }
+        default:
+            return;
+    }
 }
 
 int     GameCycle::collide(GameObject *obj1, GameObject *obj2)
@@ -285,20 +363,25 @@ int     GameCycle::collide(GameObject *obj1, GameObject *obj2)
     if (y11 < y22 && y12 > y21 && x11 < x22 && x12 > x21)
         return (1);
     return (0);
-    // todo: Test this; Implement more convenient collision detection algorithm.
 }
 
 int     GameCycle::startCycle()
 {
     while (!exitFlag)
     {
-        enemiesMax = score / 500 + 1;
+        enemiesMax = score / 400 + 8;
         actPlayer();
-        actBullets();
         actEnemies();
+        actBullet();
         clear();
         draw();
+        mvprintw(1, 1, "SCORE: %d", score);
+        mvprintw(2, 1, "HP: %d", player.hp);
         refresh();
+        if (!(tick % 2000))
+            addEnemy();
+        if (!(tick % 500))
+            moveBackground();
         tick++;
     }
     return score;

@@ -1,9 +1,9 @@
 CXX = g++
-CXXFLAGS = -O0
-CXXXFLAGS = -O0 -lncurses
+CXXFLAGS = -Wall -Werror -Wextra -O3
+CXXXFLAGS = -Wall -Wextra -Werror -O3 -lncurses
 NAME = ft_retro
 
-SRC = main.cpp Player.cpp Enemy.cpp Bullet.cpp GameObject.cpp GameCycle.cpp
+SRC = main.cpp Player.cpp Enemy.cpp Bullet.cpp GameObject.cpp GameCycle.cpp Background.cpp
 
 OBJ = $(SRC:.cpp=.o)
 

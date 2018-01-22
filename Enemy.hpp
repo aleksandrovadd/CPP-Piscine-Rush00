@@ -11,7 +11,11 @@ class Enemy : public GameObject
 {
 public:
 	Enemy();
+    Enemy(Enemy const &rhs);
+    ~Enemy();
 	Action action(int tick);
+
+    Enemy &operator=(Enemy const &src);
 };
 
 

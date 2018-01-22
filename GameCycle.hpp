@@ -17,42 +17,50 @@
 // Draw -> repeat until player is killed
 
 #define MAX_ENEMIES_COUNT 50
+#define MAX_BULLETS_COUNT 512
+#define MAX_STARS_COUNT 50
 
 class GameCycle
 {
 public:
     GameCycle();
+    GameCycle(GameCycle const &rhs);
     ~GameCycle();
     int    startCycle();
+
+    GameCycle &operator=(GameCycle const &src);
 
 protected:
     Player      player;
     Enemy**     enemies;
     int         enemiesCount;
     int         enemiesMax;
-    Bullet      bullets[256];
+    Bullet**    bullets;
     int         bulletsCount;
     int         score;
     long int    tick;
     bool        exitFlag;
+    t_back      st[MAX_STARS_COUNT];
 
     int         screenWidth;
     int         screenHeight;
-    int         offset;
 
     void        initEnemys();
-    void        initBullets();
-    void        initPlayer();
     void        initScreen();
+    void        initBullets();
+    void        initBackground();
+    void        moveBackground();
 
     void        addEnemy();
-    void        addBullet(int type, int x, int y, int dirX, int dirY);
-    void        removeBullet(int index);
-    void        removeEnemy(Enemy *enemy, int index);
+    void        removeEnemy(int index);
 
-    void        actBullets();
+    void        addBullet(int type, int x, int y);
+    void        removeBullet(int index);
+
     void        actEnemies();
     void        actPlayer();
+    void        actBullet();
+
     void        draw();
     void        makeAction(Action action); //Callback function to create bullets, etc.
 

@@ -10,7 +10,12 @@
 class Bullet : public GameObject
 {
 public:
-	Action action(int tick);
+	Bullet();
+    Bullet(Bullet const &rhs);
+    ~Bullet();
+	Action	action(int tick);
+
+    Bullet &operator=(Bullet const &src);
 };
 
 

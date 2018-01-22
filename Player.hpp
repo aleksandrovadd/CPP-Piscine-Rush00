@@ -11,7 +11,10 @@ class Player : public GameObject
 {
 public:
 	Player();
-	Action    action(int tick);
+    ~Player();
+	Action  action(int tick);
+    int     screenWidth;
+    int     screenHeight;
 };
 
 

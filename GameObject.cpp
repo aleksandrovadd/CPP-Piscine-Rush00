@@ -4,20 +4,32 @@
 
 #include "GameObject.hpp"
 
-void	GameObject::hit(int damage)
+GameObject::GameObject()
 {
-	hp -= damage;
+
 }
 
-void	GameObject::chooseColor(void)
+GameObject::~GameObject()
 {
-	if (has_colors())
-	{
-		use_default_colors();
-		start_color();
-		if (PLAYER)
-			init_pair(1, COLOR_BLUE, -1);
-		if (ENEMY)
-			init_pair(2, COLOR_RED, -1);
-	}
+
+}
+
+GameObject::GameObject(GameObject const &rhs)
+{
+	*this = rhs;
+}
+
+GameObject& GameObject::operator=(GameObject const &src)
+{
+	this->type = src.type;
+	this->hp = src.hp;
+	this->shape = src.shape;
+	this->shootSpeed = src.shootSpeed;
+	this->actionDelimiter = src.actionDelimiter;
+	return *this;
+}
+
+void GameObject::hit(int damage)
+{
+	hp -= damage;
 }

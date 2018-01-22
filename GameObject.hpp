@@ -18,6 +18,13 @@
 #define DEATH 2
 #define DAMAGE 3
 
+typedef struct 		s_back
+{
+    int				x;
+    int				y;
+    char			c;
+}					t_back;
+
 typedef struct      s_shape
 {
 	std::string*    str;
@@ -42,14 +49,20 @@ public:
 	int     			type;
 	int     			hp;
 	t_shape 			shape;
-    int     			dirX;
-    int     			dirY;
+	int 				shootSpeed;
 	virtual Action      action(int tick) = 0;
 	void                hit(int damage);
-	void				chooseColor();
+
+    GameObject();
+    GameObject(GameObject const &rhs);
+    virtual ~GameObject();
+
+    GameObject &operator=(GameObject const &src);
 
 protected:
 	int     			actionDelimiter;
+
+
 };
 
 
